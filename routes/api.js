@@ -21,12 +21,10 @@ db.on("error", console.error.bind(console, "MongoDB connection error:"));
 module.exports = function(app) {
   app.route("/api/stock-prices").get(async function(req, res) {
     if (!req.query.stock) res.status(400).send("Need ticker");
-    var isLiked = req.query.like;
     if (typeof req.query.stock !== "string") {
-      tickerOne = req.query.stock[0];
-      tickerTwo = req.query.stock[1];
-      var stockOne = await getStockData(tickerOne, req.ip, isLiked);
-      var stockTwo = await getStockData(tickerTwo, req.ip, isLiked);
+      var [tickerOne, tickerTwo] = req.query.stock;
+      var stockOne = await getStockData(tickerOne, req.ip, req.query.like);
+      var stockTwo = await getStockData(tickerTwo, req.ip, req.query.like);
       var diff = stockOne.likes - stockTwo.likes;
       return res.json({
         stockData: [
@@ -43,7 +41,7 @@ module.exports = function(app) {
         ]
       });
     } else {
-      var stock = await getStockData(req.query.stock, req.ip, isLiked);
+      var stock = await getStockData(req.query.stock, req.ip, req.query.like);
       return res.json({
         stockData: {
           stock: stock.ticker.toUpperCase(),
@@ -55,26 +53,44 @@ module.exports = function(app) {
   });
 };
 
-async function getStockData(ticker, ip, like) {
+async function getStockData(ticker, ip, like = false) {
   var stock = await Stock.findOne({ ticker });
   var price = await getStockPriceByName(ticker).toString();
 
   if (!stock) {
-    await Stock.create({
-      ticker: ticker,
-      likes: like ? 1 : 0,
-      ips: [ip]
-    });
-    return { ticker: ticker, likes: like ? 1 : 0, price: price };
+    if (!like) {
+      await Stock.create({
+        ticker: ticker,
+        likes: 0,
+        ips: []
+      });
+      return { ticker: ticker, likes: 0, price: price };
+    } else {
+      await Stock.create({
+        ticker: ticker,
+        likes: 1,
+        ips: [ip]
+      });
+      return { ticker: ticker, likes: 1, price: price };
+    }
   } else {
     if (like) {
       if (stock.ips.includes(ip)) {
         return { ticker: stock.ticker, likes: stock.likes, price: price };
       } else {
-        await Stock.update({ ticker }, { $inc: { likes: 1 } }).exec();
-        return { ticker: stock.ticker, likes: stock.likes + 1, price: price };
+        await Stock.updateOne(
+          { ticker },
+          { $inc: { likes: 1 }, $push: { ips: ip } }
+        ).exec();
+        return {
+          ticker: stock.ticker,
+          likes: stock.likes,
+          price: price
+        };
       }
     } else {
+      console.log("no like");
+
       return { ticker: stock.ticker, likes: stock.likes, price: price };
     }
   }
