@@ -14,7 +14,7 @@ var mongoose = require("mongoose");
 var Stock = require("../models/Stock").Stock;
 const fetch = require("node-fetch");
 
-mongoose.connect(process.env.DB, { useNewUrlParser: true }); //MongoClient.connect(CONNECTION_STRING, function(err, db) {});
+mongoose.connect(process.env.DB, { useNewUrlParser: true, useCreateIndex: true }); //MongoClient.connect(CONNECTION_STRING, function(err, db) {});
 var db = mongoose.connection;
 db.on("error", console.error.bind(console, "MongoDB connection error:"));
 
